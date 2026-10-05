@@ -1,7 +1,10 @@
 from datetime import timezone
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.types import TypeDecorator, String, JSON, DateTime
-from geoalchemy2 import Geography
+try:
+    from geoalchemy2 import Geography
+except ImportError:
+    Geography = None
 
 Base = declarative_base()
 
@@ -24,7 +27,7 @@ class PointGeography(TypeDecorator):
     Custom type decorator for PostGIS GEOGRAPHY(Point, 4326).
     Compiles to PostGIS Geography on PostgreSQL and String on SQLite (for portable testing).
     """
-    impl = Geography(geometry_type="POINT", srid=4326)
+    impl = Geography(geometry_type="POINT", srid=4326) if Geography is not None else String(255)
     cache_ok = True
 
     def load_dialect_impl(self, dialect):
@@ -32,7 +35,9 @@ class PointGeography(TypeDecorator):
             return self.impl
         if dialect.name == "sqlite":
             return dialect.type_descriptor(String(255))
-        return dialect.type_descriptor(Geography(geometry_type="POINT", srid=4326))
+        if Geography is not None:
+            return dialect.type_descriptor(Geography(geometry_type="POINT", srid=4326))
+        return dialect.type_descriptor(String(255))
 
 
 class IPAddressType(TypeDecorator):

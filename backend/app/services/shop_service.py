@@ -3,9 +3,14 @@ import uuid
 from typing import List, Dict, Any, Optional
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
-from geoalchemy2.elements import WKTElement
-from geoalchemy2.shape import to_shape
-from shapely.geometry import Point
+try:
+    from geoalchemy2.elements import WKTElement
+    from geoalchemy2.shape import to_shape
+    from shapely.geometry import Point
+except ImportError:
+    WKTElement = None
+    to_shape = None
+    Point = None
 
 from app.models.shop import Shop
 from app.models.user import User, UserRole
@@ -29,7 +34,7 @@ def haversine_distance_meters(lat1: float, lon1: float, lat2: float, lon2: float
 
 def create_point_element(longitude: float, latitude: float, is_sqlite: bool) -> Any:
     """Create appropriate Point representation for PostgreSQL or SQLite."""
-    if is_sqlite:
+    if is_sqlite or WKTElement is None:
         return f"POINT({longitude} {latitude})"
     return WKTElement(f"POINT({longitude} {latitude})", srid=4326)
 
@@ -43,13 +48,13 @@ def extract_coordinates(location: Any) -> tuple[float, float]:
         if len(parts) == 2:
             return float(parts[1]), float(parts[0])
         return 0.0, 0.0
-    try:
-        # GeoAlchemy2 WKBElement or WKTElement
-        shape = to_shape(location)
-        if isinstance(shape, Point):
-            return shape.y, shape.x
-    except Exception:
-        pass
+    if to_shape is not None and Point is not None:
+        try:
+            shape = to_shape(location)
+            if isinstance(shape, Point):
+                return shape.y, shape.x
+        except Exception:
+            pass
     return 0.0, 0.0
 
 
